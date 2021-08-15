@@ -159,38 +159,35 @@ public class SwiftDeviceCalendarPlugin: NSObject, FlutterPlugin {
         result(hasPermissions)
     }
     
+
     private func createCalendar(_ call: FlutterMethodCall, _ result: FlutterResult) {
-        let arguments = call.arguments as! Dictionary<String, AnyObject>
-        let calendar = EKCalendar.init(for: EKEntityType.event, eventStore: eventStore)
         do {
+            let arguments = call.arguments as! Dictionary<String, AnyObject>
+            let calendar = EKCalendar(for: .event, eventStore: eventStore)
             calendar.title = arguments[calendarNameArgument] as! String
-            let calendarColor = arguments[calendarColorArgument] as? String
-            
-            if (calendarColor != nil) {
-                calendar.cgColor = UIColor(hex: calendarColor!)?.cgColor
-            }
-            else {
-                calendar.cgColor = UIColor(red: 255, green: 0, blue: 0, alpha: 0).cgColor // Red colour as a default
-            }
-            
-            let localSources = eventStore.sources.filter { $0.sourceType == .local }
-            
-            if (!localSources.isEmpty) {
-                calendar.source = localSources.first
-                
-                try eventStore.saveCalendar(calendar, commit: true)
+            calendar.cgColor = UIColor.purple.cgColor
+
+            let `default` = eventStore.defaultCalendarForNewEvents?.source
+            let iCloud = eventStore.sources.first(where: { $0.title == "iCloud" }) // this is fragile, user can rename the source
+            let local = eventStore.sources.first(where: { $0.sourceType == .local })
+
+            let source = iCloud ?? `default` ?? local
+            if (source != nil) {
+                calendar.source = source
+                try! eventStore.saveCalendar(calendar, commit: true)
                 result(calendar.calendarIdentifier)
-            }
-            else {
+            } else {
                 result(FlutterError(code: self.genericError, message: "Local calendar was not found.", details: nil))
             }
-        }
-        catch {
+
+
+        } catch {
             eventStore.reset()
             result(FlutterError(code: self.genericError, message: error.localizedDescription, details: nil))
         }
+
     }
-    
+
     private func retrieveCalendars(_ result: @escaping FlutterResult) {
         checkPermissionsThenExecute(permissionsGrantedAction: {
             let ekCalendars = self.eventStore.calendars(for: .event)
